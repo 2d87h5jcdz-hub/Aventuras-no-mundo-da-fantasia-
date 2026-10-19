@@ -1,8 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Joaquim.Art;
 using Joaquim.Core;
+using Joaquim.Render;
 using Joaquim.UI;
 using Joaquim.World;
 using UnityEngine;
@@ -31,23 +31,26 @@ namespace Joaquim.Actors
         /// <summary>Disparado sempre que o Joaquim termina de entrar numa célula.</summary>
         public event Action<Vector2Int> CellEntered;
 
-        const float StepTime = 0.18f;
+        const float StepTime = 0.2f;
 
-        SpriteRenderer _sr;
+        Quad _body;
+        Quad _shadow;
         readonly Queue<Vector2Int> _path = new Queue<Vector2Int>();
         Vector2Int? _pendingInteract;
-        bool _moving, _scripted, _lying;
+        bool _moving, _scripted, _lying, _visible = true;
         Vector3 _from, _to;
         float _t;
         int _steps;
 
+        static Texture2D T(string n) => Art.Tex("Personagens/joaquim_" + n);
+
         void Awake()
         {
-            _sr = gameObject.AddComponent<SpriteRenderer>();
-            _sr.sortingOrder = GameWorld.OrderActors;
-            UpdateSprite();
+            _body = Quad.Billboard("sprite", transform, T("baixo0"), Vector3.zero);
+            _body.transform.localPosition = Vector3.zero;
         }
 
+        /// <summary>Chamado depois de trocar de mapa: refaz a sombra com a luz do novo lugar.</summary>
         public void Place(Vector2Int cell, Facing face = Facing.Down)
         {
             Cell = cell;
@@ -56,14 +59,29 @@ namespace Joaquim.Actors
             _path.Clear();
             _pendingInteract = null;
             transform.position = GameWorld.CellToWorld(cell);
+            if (_shadow != null) Destroy(_shadow.gameObject);
+            _shadow = World.SpawnShadow(transform.position, 0.5f, transform);
+            _body.SetColor(World.Preset.PropTint);
+            ApplyVisibility();
             UpdateSprite();
         }
 
-        public void SetVisible(bool visible) => _sr.enabled = visible;
+        public void SetVisible(bool visible)
+        {
+            _visible = visible;
+            ApplyVisibility();
+        }
+
+        void ApplyVisibility()
+        {
+            _body.Visible = _visible;
+            if (_shadow != null) _shadow.Visible = _visible && !_lying;
+        }
 
         public void SetLying(bool lying)
         {
             _lying = lying;
+            ApplyVisibility();
             UpdateSprite();
         }
 
@@ -159,12 +177,17 @@ namespace Joaquim.Actors
         void HandleTap(Vector2 screen)
         {
             if (Cam == null) return;
-            var world = Cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, -Cam.transform.position.z));
-            var target = GameWorld.WorldToCell(world);
-            if (target == Cell) return;
+            var ray = Cam.ScreenPointToRay(new Vector3(screen.x, screen.y, 0f));
 
             _path.Clear();
             _pendingInteract = null;
+
+            Vector2Int target;
+            if (!World.PickInteraction(ray, out target))
+            {
+                if (!GameWorld.PickGround(ray, out target)) return;
+            }
+            if (target == Cell) return;
 
             if (World.HasInteraction(target) && !World.IsWalkable(target))
             {
@@ -221,21 +244,17 @@ namespace Joaquim.Actors
                 return;
             }
 
-            var pos = Vector3.Lerp(_from, _to, _t);
-            // Encaixa no "pixel" da arte (1/16 de tile) pra não borrar o visual
-            pos.x = Mathf.Round(pos.x * SpriteFactory.PixelsPerUnit) / SpriteFactory.PixelsPerUnit;
-            pos.y = Mathf.Round(pos.y * SpriteFactory.PixelsPerUnit) / SpriteFactory.PixelsPerUnit;
-            transform.position = pos;
+            transform.position = Vector3.Lerp(_from, _to, _t);
             UpdateSprite();
         }
 
         void UpdateSprite()
         {
-            if (_sr == null) return;
+            if (_body == null) return;
             if (_lying)
             {
-                _sr.sprite = SpriteFactory.Get(PixelArtData.JoaquimLying);
-                _sr.flipX = false;
+                _body.SetTexture(T("deitado"));
+                _body.SetFlip(false);
                 return;
             }
 
@@ -243,17 +262,17 @@ namespace Joaquim.Actors
             switch (Face)
             {
                 case Facing.Down:
-                    _sr.sprite = SpriteFactory.Get(stride ? PixelArtData.JoaquimDown1 : PixelArtData.JoaquimDown0);
-                    _sr.flipX = stride && _steps % 2 == 0;
+                    _body.SetTexture(T(stride ? "baixo1" : "baixo0"));
+                    _body.SetFlip(stride && _steps % 2 == 0);
                     break;
                 case Facing.Up:
-                    _sr.sprite = SpriteFactory.Get(stride ? PixelArtData.JoaquimUp1 : PixelArtData.JoaquimUp0);
-                    _sr.flipX = stride && _steps % 2 == 0;
+                    _body.SetTexture(T(stride ? "cima1" : "cima0"));
+                    _body.SetFlip(stride && _steps % 2 == 0);
                     break;
                 case Facing.Left:
                 case Facing.Right:
-                    _sr.sprite = SpriteFactory.Get(stride ? PixelArtData.JoaquimSide1 : PixelArtData.JoaquimSide0);
-                    _sr.flipX = Face == Facing.Left;
+                    _body.SetTexture(T(stride ? "lado1" : "lado0"));
+                    _body.SetFlip(Face == Facing.Left);
                     break;
             }
         }

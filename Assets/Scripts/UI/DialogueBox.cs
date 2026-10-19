@@ -18,7 +18,7 @@ namespace Joaquim.UI
 
         string _speaker;
         string _text = "";
-        Sprite _portrait;
+        Texture2D _portrait;
         bool _narration;
         int _shown;
         float _acc;
@@ -29,7 +29,7 @@ namespace Joaquim.UI
         int _styleHeight = -1;
 
         /// <summary>Mostra uma fala e espera o jogador fechar.</summary>
-        public IEnumerator Say(string speaker, string text, Sprite portrait)
+        public IEnumerator Say(string speaker, string text, Texture2D portrait)
         {
             _speaker = speaker;
             _text = text ?? "";
@@ -111,7 +111,7 @@ namespace Joaquim.UI
                 float ps = content.height;
                 var frame = new Rect(content.x, content.y, ps, ps);
                 PixelGui.Box(frame, new Color32(148, 176, 194, 255));
-                GUI.DrawTexture(PixelGui.Inset(frame, u * 3), _portrait.texture, ScaleMode.ScaleToFit);
+                GUI.DrawTexture(PixelGui.Inset(frame, u * 2), _portrait, ScaleMode.ScaleToFit);
                 content.xMin += ps + Mathf.Round(h * 0.1f);
             }
 

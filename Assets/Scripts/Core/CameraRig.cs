@@ -1,72 +1,74 @@
-using Joaquim.Art;
+using Joaquim.Render;
 using Joaquim.World;
 using UnityEngine;
 
 namespace Joaquim.Core
 {
     /// <summary>
-    /// Câmera ortográfica "pixel perfect": escolhe um zoom inteiro (cada pixel da arte vira
-    /// N×N pixels da tela), segue o Joaquim e não deixa mostrar fora do mapa.
+    /// Câmera 3D em perspectiva (estilo HD-2D): olha o Joaquim um pouco de cima,
+    /// segue de forma suave, não mostra demais além das bordas e mantém o foco nele.
     /// </summary>
     [DefaultExecutionOrder(100)]
     public sealed class CameraRig : MonoBehaviour
     {
-        /// <summary>Quantos tiles de altura queremos ver, aproximadamente.</summary>
-        public float TargetTilesTall = 11f;
-
         public Transform Target;
         public GameWorld World;
+        public HD2DPost Post;
 
-        /// <summary>Intensidade do tremor (em tiles). A história liga e desliga.</summary>
+        /// <summary>Intensidade do tremor (em unidades). A história liga e desliga.</summary>
         public float Shake;
 
         Camera _cam;
-        int _lastHeight = -1;
-        int _scale = 1;
+        Vector3 _smoothTarget;
+        bool _snap = true;
 
         void Awake()
         {
             _cam = GetComponent<Camera>();
         }
 
+        /// <summary>Pula direto para o alvo (ao trocar de mapa).</summary>
+        public void Snap() => _snap = true;
+
         void LateUpdate()
         {
-            UpdateZoom();
             if (Target == null || World == null || World.Map == null) return;
-
+            var p = World.Preset;
             var map = World.Map;
-            float halfH = _cam.orthographicSize;
-            float halfW = halfH * _cam.aspect;
-            Vector3 t = Target.position;
 
-            // Mundo: x vai de -0.5 até W-0.5; y vai de 0.5 até -(H-0.5)
-            float x = map.Width <= halfW * 2f
-                ? (map.Width - 1) / 2f
-                : Mathf.Clamp(t.x, -0.5f + halfW, map.Width - 0.5f - halfW);
-            float y = map.Height <= halfH * 2f
-                ? -(map.Height - 1) / 2f
-                : Mathf.Clamp(t.y, -(map.Height - 0.5f) + halfH, 0.5f - halfH);
+            _cam.fieldOfView = p.CamFov;
+            _cam.backgroundColor = p.Background;
 
-            if (Shake > 0f)
+            var aim = Target.position + Vector3.up * p.CamTargetHeight;
+
+            // limita o x para não mostrar muito além das bordas do mapa
+            float hfov = Mathf.Atan(Mathf.Tan(p.CamFov * Mathf.Deg2Rad / 2f) * _cam.aspect);
+            float half = Mathf.Tan(hfov) * p.CamDistance;
+            float minX = -0.5f - p.CamSidePadding, maxX = map.Width - 0.5f + p.CamSidePadding;
+            aim.x = maxX - minX <= half * 2f ? (minX + maxX) / 2f : Mathf.Clamp(aim.x, minX + half, maxX - half);
+
+            if (_snap)
             {
-                x += Random.Range(-Shake, Shake);
-                y += Random.Range(-Shake, Shake);
+                _smoothTarget = aim;
+                _snap = false;
+            }
+            else
+            {
+                _smoothTarget = Vector3.Lerp(_smoothTarget, aim, 1f - Mathf.Exp(-Time.deltaTime * 8f));
             }
 
-            // Arredonda para o pixel da TELA, evitando "tremidinhas" e emendas entre tiles
-            float unitsPerScreenPixel = 1f / (SpriteFactory.PixelsPerUnit * _scale);
-            x = Mathf.Round(x / unitsPerScreenPixel) * unitsPerScreenPixel;
-            y = Mathf.Round(y / unitsPerScreenPixel) * unitsPerScreenPixel;
+            var rot = Quaternion.Euler(p.CamPitch, 0f, 0f);
+            var pos = _smoothTarget - rot * Vector3.forward * p.CamDistance;
+            if (Shake > 0f)
+                pos += new Vector3(Random.Range(-Shake, Shake), Random.Range(-Shake, Shake), 0f);
 
-            transform.position = new Vector3(x, y, -10f);
-        }
+            transform.SetPositionAndRotation(pos, rot);
 
-        void UpdateZoom()
-        {
-            if (Screen.height == _lastHeight) return;
-            _lastHeight = Screen.height;
-            _scale = Mathf.Max(1, Mathf.RoundToInt(Screen.height / (SpriteFactory.PixelsPerUnit * TargetTilesTall)));
-            _cam.orthographicSize = Screen.height / (float)(SpriteFactory.PixelsPerUnit * _scale) / 2f;
+            if (Post != null)
+            {
+                Post.Preset = p;
+                Post.FocusDistance = Vector3.Distance(pos, Target.position + Vector3.up * 1f);
+            }
         }
     }
 }

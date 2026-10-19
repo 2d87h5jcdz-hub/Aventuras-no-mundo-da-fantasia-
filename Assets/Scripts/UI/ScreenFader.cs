@@ -1,5 +1,4 @@
 using System.Collections;
-using Joaquim.Art;
 using UnityEngine;
 
 namespace Joaquim.UI

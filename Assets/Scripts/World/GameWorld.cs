@@ -1,87 +1,60 @@
 using System;
 using System.Collections.Generic;
-using Joaquim.Art;
+using Joaquim.Render;
 using UnityEngine;
 
 namespace Joaquim.World
 {
     /// <summary>
-    /// Monta o mapa atual na tela e responde perguntas sobre ele:
+    /// Monta o mapa atual em 3D e responde perguntas sobre ele:
     /// dá pra andar aqui? tem gatilho? tem algo pra interagir?
-    /// Coordenadas: célula (x, y) com y crescendo pra baixo; no mundo vira (x, -y).
+    /// Coordenadas: célula (x, y) do mapa, com y crescendo pra baixo; no mundo vira (x, 0, -y).
     /// </summary>
     public sealed class GameWorld : MonoBehaviour
     {
-        public const int OrderGround = 0;
-        public const int OrderItems = 5;
-        public const int OrderActors = 10;
-        public const int OrderEffects = 50;
-
         public MapDef Map { get; private set; }
+        public ScenePreset Preset { get; set; } = new ScenePreset();
+        public Transform Root { get; private set; }
 
-        Transform _root;
+        /// <summary>Peças que a história troca de imagem (porta, cama).</summary>
+        public Quad Door { get; set; }
+        public Quad BedTop { get; set; }
+
         bool[,] _solid;
-        readonly Dictionary<Vector2Int, SpriteRenderer> _tiles = new Dictionary<Vector2Int, SpriteRenderer>();
         readonly Dictionary<Vector2Int, Action> _stepTriggers = new Dictionary<Vector2Int, Action>();
         readonly Dictionary<Vector2Int, Action> _interactions = new Dictionary<Vector2Int, Action>();
+        readonly Dictionary<Vector2Int, float> _interactionHeight = new Dictionary<Vector2Int, float>();
         readonly HashSet<Vector2Int> _blockers = new HashSet<Vector2Int>();
 
         static readonly Vector2Int[] Dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
 
-        public static Vector3 CellToWorld(Vector2Int c) => new Vector3(c.x, -c.y, 0f);
+        public static Vector3 CellToWorld(Vector2Int c) => new Vector3(c.x, 0f, -c.y);
 
-        public static Vector2Int WorldToCell(Vector3 w) => new Vector2Int(Mathf.RoundToInt(w.x), Mathf.RoundToInt(-w.y));
+        public static Vector2Int WorldToCell(Vector3 w) => new Vector2Int(Mathf.RoundToInt(w.x), Mathf.RoundToInt(-w.z));
 
         public void Load(MapDef map)
         {
-            if (_root != null) Destroy(_root.gameObject);
-            _tiles.Clear();
+            if (Root != null) Destroy(Root.gameObject);
             _stepTriggers.Clear();
             _interactions.Clear();
+            _interactionHeight.Clear();
             _blockers.Clear();
+            Door = null;
+            BedTop = null;
 
             Map = map;
-            _root = new GameObject("Mapa: " + map.Name).transform;
-            _root.SetParent(transform, false);
-            _solid = new bool[map.Width, map.Height];
+            Root = new GameObject("Mapa: " + map.Name).transform;
+            Root.SetParent(transform, false);
 
+            _solid = new bool[map.Width, map.Height];
             for (int y = 0; y < map.Height; y++)
             for (int x = 0; x < map.Width; x++)
-            {
-                var cell = new Vector2Int(x, y);
-                char c = map.At(cell);
-                if (TileLegend.IsMarker(c)) c = TileLegend.GroundUnder(map, cell);
+                _solid[x, y] = TileLegend.IsSolid(map.Rows[y][x]);
 
-                if (!TileLegend.TryGet(c, x, y, out var info))
-                {
-                    _solid[x, y] = true; // espaço vazio ou caractere desconhecido
-                    if (c != ' ') Debug.LogWarning($"Mapa {map.Name}: caractere '{c}' sem tile em ({x},{y}).");
-                    continue;
-                }
-
-                _solid[x, y] = info.Solid;
-                _tiles[cell] = NewSprite("tile", info.Art, cell, OrderGround);
-            }
-        }
-
-        SpriteRenderer NewSprite(string name, string[] art, Vector2Int cell, int order)
-        {
-            var go = new GameObject(name);
-            go.transform.SetParent(_root, false);
-            go.transform.position = CellToWorld(cell);
-            var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = art != null ? SpriteFactory.Get(art) : null;
-            sr.sortingOrder = order;
-            return sr;
-        }
-
-        /// <summary>Cria um objeto desenhado que pertence ao mapa atual (some quando o mapa troca).</summary>
-        public SpriteRenderer SpawnSprite(string name, string[] art, Vector2Int cell, int order = OrderItems)
-            => NewSprite(name, art, cell, order);
-
-        public void SetTileArt(Vector2Int cell, string[] art)
-        {
-            if (_tiles.TryGetValue(cell, out var sr)) sr.sprite = SpriteFactory.Get(art);
+            Preset = SceneBuilder.Build(this, map);
+            Shader.SetGlobalColor("_HazeColor", Preset.HazeColor);
+            Shader.SetGlobalFloat("_HazeDensity", Preset.HazeDensity);
+            Shader.SetGlobalFloat("_HazeStrength", Preset.HazeStrength);
         }
 
         public List<Vector2Int> FindAll(char c)
@@ -98,6 +71,35 @@ namespace Joaquim.World
         public void AddBlocker(Vector2Int c) => _blockers.Add(c);
         public void RemoveBlocker(Vector2Int c) => _blockers.Remove(c);
 
+        // ---------------------------------------------------------- objetos criados pela história
+
+        /// <summary>Imagem em pé numa célula (some quando o mapa troca).</summary>
+        public Quad SpawnBillboard(string name, Texture2D tex, Vector2Int cell, QuadStyle style = QuadStyle.Cutout,
+            float scale = 1f, float lift = 0f)
+        {
+            var q = Quad.Billboard(name, Root, tex, CellToWorld(cell) + Vector3.up * lift, scale, style);
+            if (style == QuadStyle.Cutout) q.SetColor(Preset.PropTint);
+            return q;
+        }
+
+        public Quad SpawnShadow(Vector3 foot, float radius, Transform parent = null)
+        {
+            var off = new Vector3(Preset.ShadowOffset.x, 0f, Preset.ShadowOffset.y) * radius;
+            var q = Quad.Decal("sombra", parent != null ? parent : Root, Art.Tex("Efeitos/sombra"), foot + off,
+                new Vector2(radius * 2.4f, radius * 1.1f), QuadStyle.Shadow);
+            q.SetColor(Preset.ShadowColor);
+            if (parent != null) q.transform.localPosition = off;
+            return q;
+        }
+
+        public Quad SpawnLight(Vector3 center, float radius, Color color)
+        {
+            var q = Quad.Decal("luz", Root, Art.Tex("Efeitos/luz"), center, new Vector2(radius * 2f, radius * 2f),
+                QuadStyle.Additive, 0.03f);
+            q.SetColor(color);
+            return q;
+        }
+
         // ---------------------------------------------------------- gatilhos e interações
 
         public void OnStep(Vector2Int cell, Action action) => _stepTriggers[cell] = action;
@@ -110,13 +112,53 @@ namespace Joaquim.World
             return true;
         }
 
-        public void OnInteract(Vector2Int cell, Action action) => _interactions[cell] = action;
+        /// <summary>Algo que dá pra tocar/usar. <paramref name="height"/> é a altura da figura (para o toque na tela).</summary>
+        public void OnInteract(Vector2Int cell, Action action, float height = 1f)
+        {
+            _interactions[cell] = action;
+            _interactionHeight[cell] = height;
+        }
+
         public bool HasInteraction(Vector2Int cell) => _interactions.ContainsKey(cell);
 
         public bool TryInteract(Vector2Int cell)
         {
             if (!_interactions.TryGetValue(cell, out var action)) return false;
             action();
+            return true;
+        }
+
+        /// <summary>O toque acertou a figura de algo interativo? (testa a "placa" em pé de cada um)</summary>
+        public bool PickInteraction(Ray ray, out Vector2Int cell)
+        {
+            cell = default;
+            float best = float.MaxValue;
+            bool found = false;
+            foreach (var kv in _interactionHeight)
+            {
+                var c = kv.Key;
+                float planeZ = -c.y;
+                if (Mathf.Abs(ray.direction.z) < 1e-4f) continue;
+                float t = (planeZ - ray.origin.z) / ray.direction.z;
+                if (t <= 0f || t >= best) continue;
+                var p = ray.GetPoint(t);
+                if (Mathf.Abs(p.x - c.x) <= 0.6f && p.y >= -0.1f && p.y <= kv.Value)
+                {
+                    best = t;
+                    cell = c;
+                    found = true;
+                }
+            }
+            return found;
+        }
+
+        /// <summary>Célula do chão que o toque acertou.</summary>
+        public static bool PickGround(Ray ray, out Vector2Int cell)
+        {
+            cell = default;
+            if (ray.direction.y > -1e-4f) return false;
+            float t = -ray.origin.y / ray.direction.y;
+            cell = WorldToCell(ray.GetPoint(t));
             return true;
         }
 

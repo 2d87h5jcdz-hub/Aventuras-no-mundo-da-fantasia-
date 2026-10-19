@@ -1,22 +1,22 @@
-using Joaquim.Art;
+using Joaquim.Render;
 using UnityEngine;
 
 namespace Joaquim.Actors
 {
-    /// <summary>Troca os quadros de um SpriteRenderer em sequência (null = esconde naquele quadro).</summary>
+    /// <summary>Troca as imagens de um Quad em sequência (null = esconde naquele quadro).</summary>
     public sealed class FrameAnimator : MonoBehaviour
     {
-        string[][] _frames;
+        Texture2D[] _frames;
         float[] _durations;
-        SpriteRenderer _sr;
+        Quad _quad;
         int _index;
         float _timer;
 
-        public void Play(string[][] frames, float[] durations)
+        public void Play(Texture2D[] frames, float[] durations)
         {
             _frames = frames;
             _durations = durations;
-            _sr = GetComponent<SpriteRenderer>();
+            _quad = GetComponent<Quad>();
             _index = 0;
             _timer = 0f;
             Apply();
@@ -35,9 +35,9 @@ namespace Joaquim.Actors
 
         void Apply()
         {
-            var art = _frames[_index];
-            _sr.enabled = art != null;
-            if (art != null) _sr.sprite = SpriteFactory.Get(art);
+            var tex = _frames[_index];
+            _quad.Visible = tex != null;
+            if (tex != null) _quad.SetTexture(tex);
         }
     }
 }

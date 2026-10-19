@@ -1,4 +1,3 @@
-using Joaquim.Art;
 using UnityEngine;
 
 namespace Joaquim.UI

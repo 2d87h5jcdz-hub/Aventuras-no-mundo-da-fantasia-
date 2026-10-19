@@ -80,6 +80,8 @@ namespace Joaquim.EditorTools
                 ? custom
                 : DefaultLocation(target);
 
+            // garante que as imagens usem as regras do ArtImporter (pixel nítido, sem compressão)
+            AssetDatabase.ImportAsset("Assets/Resources/Art", ImportAssetOptions.ImportRecursive | ImportAssetOptions.ForceUpdate);
             EnsureMainScene();
             ApplyPlayerSettings(version, runNumber);
             if (target == BuildTarget.Android) EditorUserBuildSettings.buildAppBundle = false; // APK, não AAB

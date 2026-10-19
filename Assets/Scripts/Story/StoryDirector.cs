@@ -1,9 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using Joaquim.Actors;
-using Joaquim.Art;
 using Joaquim.Audio;
 using Joaquim.Core;
+using Joaquim.Render;
 using Joaquim.UI;
 using Joaquim.World;
 using UnityEngine;
@@ -22,15 +22,17 @@ namespace Joaquim.Story
         CameraRig _rig;
         DialogueBox _dialogue;
         ScreenFader _fader;
+        Motes _motes;
 
         // Estado da história
         bool _busy, _restart;
         bool _noticedGlint, _hasWatch, _talkedToPai;
         Vector2Int _watchCell, _doorCell, _bedHeadCell;
-        SpriteRenderer _glint;
+        Quad _glint;
 
-        public void Init(GameWorld world, Player player, CameraRig rig, DialogueBox dialogue, ScreenFader fader)
+        public void Init(GameWorld world, Player player, CameraRig rig, DialogueBox dialogue, ScreenFader fader, Motes motes)
         {
+            _motes = motes;
             _world = world;
             _player = player;
             _rig = rig;
@@ -82,6 +84,8 @@ namespace Joaquim.Story
             _player.SetVisible(true);
             _player.SetLying(false);
             _rig.Shake = 0f;
+            _rig.Snap();
+            _motes.Configure(_world.Preset.MoteCount, _world.Preset.MoteColor, _world.Preset.MoteSize);
 
             if (map == Maps.Escola) SetupEscola();
             else if (map == Maps.Casa) SetupCasa();
@@ -92,9 +96,10 @@ namespace Joaquim.Story
         void SetupEscola()
         {
             _watchCell = _world.FindAll('*')[0];
-            _glint = _world.SpawnSprite("Brilho", PixelArtData.Glint0, _watchCell, GameWorld.OrderItems);
+            _glint = _world.SpawnBillboard("Brilho", Art.Tex("Objetos/brilho0"), _watchCell, QuadStyle.Additive, 1f, 0.05f);
+            _glint.SetColor(new Color(1f, 1f, 1f, 1.4f));
             _glint.gameObject.AddComponent<FrameAnimator>().Play(
-                new[] { PixelArtData.Glint0, PixelArtData.Glint1, PixelArtData.Glint0, null },
+                new[] { Art.Tex("Objetos/brilho0"), Art.Tex("Objetos/brilho1"), Art.Tex("Objetos/brilho0"), null },
                 new[] { 0.15f, 0.25f, 0.15f, 1.1f });
 
             _world.OnStep(_watchCell, () => Trigger(AchouRelogio()));
@@ -105,9 +110,10 @@ namespace Joaquim.Story
         void SetupCasa()
         {
             var pai = _world.FindAll('P')[0];
-            _world.SpawnSprite("Pai", PixelArtData.Pai, pai, GameWorld.OrderActors);
+            _world.SpawnBillboard("Pai", Art.Tex("Personagens/pai"), pai);
+            _world.SpawnShadow(GameWorld.CellToWorld(pai), 0.55f);
             _world.AddBlocker(pai);
-            _world.OnInteract(pai, () => Trigger(ConversaPai()));
+            _world.OnInteract(pai, () => Trigger(ConversaPai()), 2.4f);
 
             _doorCell = _world.FindAll('d')[0];
             _world.OnStep(_doorCell, () => Trigger(PortaQuarto()));
@@ -116,9 +122,9 @@ namespace Joaquim.Story
         void SetupQuarto()
         {
             _bedHeadCell = _world.FindAll('B')[0];
-            _world.OnInteract(_bedHeadCell, () => Trigger(Dormir()));
+            _world.OnInteract(_bedHeadCell, () => Trigger(Dormir()), 1.4f);
             foreach (var foot in _world.FindAll('E'))
-                _world.OnInteract(foot, () => Trigger(Dormir()));
+                _world.OnInteract(foot, () => Trigger(Dormir()), 0.6f);
         }
 
         void SetupFloresta()
@@ -182,7 +188,7 @@ namespace Joaquim.Story
             }
             yield return Say(Roteiro.ConversaPai);
             _talkedToPai = true;
-            _world.SetTileArt(_doorCell, PixelArtData.DoorOpen);
+            if (_world.Door != null) _world.Door.SetTexture(Art.Tex("Cenarios/porta_aberta"));
             Sfx.Door();
         }
 
@@ -201,8 +207,7 @@ namespace Joaquim.Story
             LoadMap(Maps.Quarto);
             yield return new WaitForSeconds(1.4f);
             yield return _fader.FadeCaption(0f, 0.5f);
-            // o quarto fica à meia-luz: é noite
-            yield return _fader.FadeTo(Color.black, 0.25f, 0.8f);
+            yield return _fader.FadeTo(Color.black, 0f, 0.8f);
             yield return Say(Roteiro.QuartoChegada);
         }
 
@@ -211,25 +216,30 @@ namespace Joaquim.Story
             // Joaquim deita
             yield return _fader.FadeTo(Color.black, 1f, 0.6f);
             _player.SetVisible(false);
-            _world.SetTileArt(_bedHeadCell, PixelArtData.BedSleeping);
+            if (_world.BedTop != null) _world.BedTop.SetTexture(Art.Tex("Objetos/cama_topo_dormindo"));
             yield return new WaitForSeconds(0.4f);
-            yield return _fader.FadeTo(Color.black, 0.5f, 1f);
+            yield return _fader.FadeTo(Color.black, 0.35f, 1f);
             yield return Say(Roteiro.NaCama);
 
-            // tic... tac... pequenas piscadas de luz
-            var glow = _world.SpawnSprite("Luz do relógio", null, _bedHeadCell, GameWorld.OrderEffects);
-            glow.sprite = SpriteFactory.Glow();
+            // tic... tac... pequenas piscadas de luz saindo do pulso
+            var center = GameWorld.CellToWorld(_bedHeadCell) + new Vector3(0f, 0.75f, -0.6f);
+            var glow = Quad.Surface("Luz do relógio", _world.Root, Art.Tex("Efeitos/luz"),
+                new Vector3(-0.5f, 0.5f, 0f), Vector3.right, Vector3.down, QuadStyle.Additive);
+            glow.transform.position = center;
+            glow.SetColor(new Color(0.7f, 1f, 1f, 1.6f));
+            var floor = _world.SpawnLight(center, 0.5f, new Color(0.55f, 0.95f, 1f, 0.9f));
             for (int i = 0; i < 4; i++)
             {
                 Sfx.Tick();
-                glow.transform.localScale = Vector3.one * (0.18f + i * 0.06f);
-                glow.enabled = true;
+                glow.transform.localScale = Vector3.one * (0.5f + i * 0.2f);
+                glow.Visible = floor.Visible = true;
                 yield return new WaitForSeconds(0.12f);
-                glow.enabled = false;
+                glow.Visible = floor.Visible = false;
                 yield return new WaitForSeconds(0.55f);
             }
-            glow.enabled = true;
-            glow.transform.localScale = Vector3.one * 0.3f;
+            glow.Visible = floor.Visible = true;
+            glow.transform.localScale = Vector3.one * 0.8f;
+            yield return _fader.FadeTo(Color.black, 0f, 0.4f);
             yield return Say(Roteiro.RelogioBrilha);
 
             // a luz cresce até tomar o quarto inteiro
@@ -240,8 +250,10 @@ namespace Joaquim.Story
             {
                 float k = t / duration;
                 float pulse = 1f + Mathf.Sin(t * Mathf.Lerp(6f, 22f, k)) * 0.08f;
-                glow.transform.localScale = Vector3.one * Mathf.Lerp(0.3f, 12f, k * k * k) * pulse;
-                _rig.Shake = Mathf.Lerp(0f, 0.12f, k);
+                float size = Mathf.Lerp(0.8f, 26f, k * k * k) * pulse;
+                glow.transform.localScale = Vector3.one * size;
+                floor.transform.localScale = new Vector3(size, 1f, size);
+                _rig.Shake = Mathf.Lerp(0f, 0.15f, k);
                 if (!whiteStarted && k > 0.55f)
                 {
                     whiteStarted = true;
@@ -256,7 +268,6 @@ namespace Joaquim.Story
             // ...e ele acorda em outro lugar
             LoadMap(Maps.Floresta);
             _player.SetLying(true);
-            _fader.Vignette = true;
             yield return new WaitForSeconds(0.5f);
             yield return _fader.FadeTo(Color.white, 0f, 2.8f);
             yield return Say(Roteiro.Acordou);
@@ -325,28 +336,30 @@ namespace Joaquim.Story
             }
         }
 
-        static Sprite RetratoDe(Fala f)
+        static Texture2D RetratoDe(Fala f)
         {
-            if (f.MostraRelogio) return SpriteFactory.Get(PixelArtData.Watch);
+            if (f.MostraRelogio) return Art.Tex("Retratos/relogio");
             switch (f.Quem)
             {
-                case Quem.Joaquim: return SpriteFactory.Get(PixelArtData.JoaquimDown0);
-                case Quem.Pai: return SpriteFactory.Get(PixelArtData.Pai);
-                default: return null;
+                case Quem.Joaquim:
+                    return Art.Tex("Retratos/joaquim_" + f.Emocao.ToString().ToLowerInvariant());
+                case Quem.Pai:
+                    bool alegre = f.Emocao == Emocao.Feliz || f.Emocao == Emocao.Animado;
+                    return Art.Tex(alegre ? "Retratos/pai_feliz" : "Retratos/pai_normal");
+                default:
+                    return null;
             }
         }
 
         /// <summary>Balãozinho de "!" em cima do Joaquim.</summary>
         IEnumerator Exclaim()
         {
-            var bubble = _world.SpawnSprite("!", PixelArtData.Exclaim, _player.Cell, GameWorld.OrderEffects);
-            var basePos = _player.transform.position + new Vector3(0f, 0.85f, 0f);
+            var basePos = _player.transform.position + new Vector3(0f, 2.25f, -0.05f);
+            var bubble = Quad.Billboard("!", _world.Root, Art.Tex("Objetos/exclamacao"), basePos);
             for (float t = 0; t < 0.7f; t += Time.deltaTime)
             {
-                float hop = t < 0.15f ? Mathf.Sin(t / 0.15f * Mathf.PI) * 0.2f : 0f;
-                var p = basePos + new Vector3(0f, hop, 0f);
-                p.y = Mathf.Round(p.y * SpriteFactory.PixelsPerUnit) / SpriteFactory.PixelsPerUnit;
-                bubble.transform.position = p;
+                float hop = t < 0.15f ? Mathf.Sin(t / 0.15f * Mathf.PI) * 0.25f : 0f;
+                bubble.transform.position = basePos + new Vector3(0f, hop, 0f);
                 yield return null;
             }
             Destroy(bubble.gameObject);

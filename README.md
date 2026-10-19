@@ -8,8 +8,32 @@ Este repositório tem o **Capítulo 1 (prólogo)**:
 3. Ao deitar, o relógio emite uma luz que cresce até tomar o quarto inteiro.
 4. Ele abre os olhos numa floresta densa... *continua.*
 
-Tudo é montado por código: a arte é desenhada em texto (pixel por pixel), os mapas são
-desenhados com caracteres e os sons são sintetizados. Não há arquivos de imagem ou áudio.
+Visual **HD-2D** (inspirado em Octopath Traveler): pixel art dentro de cenários 3D com
+câmera em perspectiva, desfoque de profundidade, brilho (bloom), raios de luz, névoa e
+partículas. Os mapas são desenhados com caracteres e os sons são sintetizados.
+
+## Download para testar
+
+- iPhone (SideStore): https://github.com/2d87h5jcdz-hub/Aventuras-no-mundo-da-fantasia-/releases/latest/download/Joaquim.ipa
+- Android: https://github.com/2d87h5jcdz-hub/Aventuras-no-mundo-da-fantasia-/releases/latest/download/Joaquim.apk
+
+## Arte
+
+Toda a arte é gerada pelo script `tools/arte/gerar.py` (Python + numpy + Pillow) e salva em
+`Assets/Resources/Art`. Para mudar algo visual, edite o script e rode de novo:
+
+```
+pip install numpy pillow
+python tools/arte/gerar.py
+```
+
+| Pasta | Conteúdo |
+|---|---|
+| `Personagens/` | Joaquim (4 direções + passo, deitado) e o pai |
+| `Retratos/` | retratos 48x48 com emoções (normal, feliz, animado, surpreso, triste, chateado, raiva, medo) |
+| `Cenarios/` | chão de cada mapa, fachada, telhado, paredes, portas, céu |
+| `Objetos/` | árvores, arbustos, cerca, poste, móveis, coisas da floresta |
+| `Efeitos/` | sombra, luz e partículas (filtro suave) |
 
 ## Rodar no computador (Windows)
 
@@ -56,11 +80,13 @@ os seguintes usam cache da pasta `Library`.
 
 | Quero mudar... | Arquivo |
 |---|---|
-| Falas e textos das telas | `Assets/Scripts/Story/Roteiro.cs` |
+| Falas, textos e emoções dos retratos | `Assets/Scripts/Story/Roteiro.cs` |
+| Clima visual de cada lugar (câmera, luz, desfoque, cor) | `Assets/Scripts/Render/ScenePreset.cs` |
+| Como cada mapa vira cenário 3D | `Assets/Scripts/World/SceneBuilder.cs` |
 | Ordem dos acontecimentos (cenas) | `Assets/Scripts/Story/StoryDirector.cs` |
 | Cenários (mapas em texto) | `Assets/Scripts/World/Maps.cs` |
-| O que cada caractere do mapa significa | `Assets/Scripts/World/TileLegend.cs` |
-| Desenhos (pixel art 16×16) e paleta | `Assets/Scripts/Art/PixelArtData.cs` |
+| Quais caracteres do mapa bloqueiam a passagem | `Assets/Scripts/World/TileLegend.cs` |
+| Desenhos (pixel art) | `tools/arte/*.py` → `Assets/Resources/Art` |
 | Nome do app, ID, orientação | `Assets/Editor/BuildScript.cs` |
 
 ### Estrutura
@@ -69,12 +95,14 @@ os seguintes usam cache da pasta `Library`.
 Assets/
   Scripts/
     GameBootstrap.cs      monta câmera, mundo, personagem e história ao dar Play
-    Art/                  pixel art em texto + conversão para Sprites
-    World/                mapas, tiles, colisão, gatilhos, caminho (toque pra andar)
+    Render/               visual HD-2D: quads 3D, shaders, pós-processamento, partículas
+    World/                mapas, montagem 3D, colisão, gatilhos, caminho (toque pra andar)
     Actors/               Joaquim (movimento em grade) e animação de quadros
     UI/                   caixa de diálogo, fades, letreiros (IMGUI)
     Story/                roteiro (texto) e diretor (sequência das cenas)
     Audio/                efeitos 8 bits gerados por código
-    Core/                 entrada (toque/teclado) e câmera pixel perfect
+    Core/                 entrada (toque/teclado) e câmera em perspectiva
+  Resources/Art/          imagens geradas por tools/arte/gerar.py
+  Resources/Shaders/      shaders do visual HD-2D
   Editor/BuildScript.cs   build usado pelo CI e menu "Joaquim" no editor
 ```

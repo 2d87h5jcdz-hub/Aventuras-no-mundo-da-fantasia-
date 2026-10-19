@@ -1,6 +1,7 @@
 using Joaquim.Actors;
 using Joaquim.Audio;
 using Joaquim.Core;
+using Joaquim.Render;
 using Joaquim.Story;
 using Joaquim.UI;
 using Joaquim.World;
@@ -21,8 +22,10 @@ namespace Joaquim
 
             Application.targetFrameRate = 60;
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
+            QualitySettings.shadows = ShadowQuality.Disable;
+            QualitySettings.antiAliasing = 0;
 
-            // Câmera
+            // Câmera 3D em perspectiva (estilo HD-2D)
             var cam = Camera.main;
             if (cam == null)
             {
@@ -30,13 +33,17 @@ namespace Joaquim
                 cam = camGo.AddComponent<Camera>();
             }
             if (cam.GetComponent<AudioListener>() == null) cam.gameObject.AddComponent<AudioListener>();
-            cam.orthographic = true;
+            cam.orthographic = false;
+            cam.fieldOfView = 31f;
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = Color.black;
-            cam.nearClipPlane = 0.1f;
-            cam.farClipPlane = 100f;
+            cam.nearClipPlane = 0.3f;
+            cam.farClipPlane = 120f;
             cam.allowMSAA = false;
-            cam.transform.SetPositionAndRotation(new Vector3(0f, 0f, -10f), Quaternion.identity);
+            cam.allowHDR = false;
+
+            var post = cam.GetComponent<HD2DPost>();
+            if (post == null) post = cam.gameObject.AddComponent<HD2DPost>();
 
             // Sistemas
             var root = new GameObject("Jogo");
@@ -53,9 +60,13 @@ namespace Joaquim
             if (rig == null) rig = cam.gameObject.AddComponent<CameraRig>();
             rig.World = world;
             rig.Target = player.transform;
+            rig.Post = post;
+
+            var motes = new GameObject("Partículas").AddComponent<Motes>();
+            motes.Follow = player.transform;
 
             var story = root.AddComponent<StoryDirector>();
-            story.Init(world, player, rig, dialogue, fader);
+            story.Init(world, player, rig, dialogue, fader, motes);
         }
     }
 }
