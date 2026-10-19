@@ -130,3 +130,29 @@ jobs:
           name: Joaquim-iOS-ipa
           path: Joaquim.ipa
           if-no-files-found: error
+
+  publicar:
+    name: Publicar na página de Releases (link fixo)
+    needs: [unity, ios-ipa]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Joaquim-iOS-ipa
+      - uses: actions/download-artifact@v4
+        with:
+          name: Joaquim-Android-apk
+      - name: Atualizar a release "ultima-versao"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la
+          gh release delete ultima-versao --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
+          gh release create ultima-versao Joaquim.ipa *.apk \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Versão de teste #${{ github.run_number }}" \
+            --notes "Build automático. iPhone: baixe o Joaquim.ipa e abra no SideStore. Android: baixe o .apk."
