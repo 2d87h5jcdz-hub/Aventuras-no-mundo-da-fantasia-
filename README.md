@@ -1,4 +1,4 @@
-# Joaquim e o Relógio de Luz
+# Joaquim No Reino da Fantasia
 
 Jogo pixelado para celular (Android e iPhone) feito na **Unity 6.3 LTS** com C#.
 Este repositório tem o **Capítulo 1 (prólogo)**:
@@ -16,6 +16,11 @@ partículas. Os mapas são desenhados com caracteres e os sons são sintetizados
 
 - iPhone (SideStore): https://github.com/2d87h5jcdz-hub/Aventuras-no-mundo-da-fantasia-/releases/latest/download/Joaquim.ipa
 - Android: https://github.com/2d87h5jcdz-hub/Aventuras-no-mundo-da-fantasia-/releases/latest/download/Joaquim.apk
+
+## Vídeo de abertura
+
+`Assets/StreamingAssets/abertura.mp4` (2:19, com música) toca ao abrir o jogo; um toque pula.
+É gerado pelos scripts em `tools/abertura` — veja `tools/abertura/LEIAME.md`.
 
 ## Arte
 

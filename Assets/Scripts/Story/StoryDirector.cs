@@ -23,6 +23,8 @@ namespace Joaquim.Story
         DialogueBox _dialogue;
         ScreenFader _fader;
         Motes _motes;
+        IntroVideo _intro;
+        bool _introPlayed;
 
         // Estado da história
         bool _busy, _restart;
@@ -30,8 +32,10 @@ namespace Joaquim.Story
         Vector2Int _watchCell, _doorCell, _bedHeadCell;
         Quad _glint;
 
-        public void Init(GameWorld world, Player player, CameraRig rig, DialogueBox dialogue, ScreenFader fader, Motes motes)
+        public void Init(GameWorld world, Player player, CameraRig rig, DialogueBox dialogue, ScreenFader fader, Motes motes,
+            IntroVideo intro)
         {
+            _intro = intro;
             _motes = motes;
             _world = world;
             _player = player;
@@ -55,6 +59,13 @@ namespace Joaquim.Story
             LoadMap(Maps.Escola);
             _player.Locked = true;
             yield return null;
+
+            // vídeo de abertura (só na primeira vez; ao jogar de novo vai direto ao título)
+            if (!_introPlayed && _intro != null)
+            {
+                _introPlayed = true;
+                yield return _intro.Play();
+            }
 
             // Tela de título com a escola ao fundo
             yield return _fader.FadeTo(Color.black, 0.6f, 1f);

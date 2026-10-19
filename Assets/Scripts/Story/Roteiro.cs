@@ -39,7 +39,7 @@ namespace Joaquim.Story
 
         // ---------------------------------------------------------------- telas
 
-        public const string Titulo = "Joaquim e o Relógio de Luz";
+        public const string Titulo = "Joaquim No Reino da Fantasia";
         public const string TocarParaComecar = "Toque para começar";
         public const string Capitulo1 = "Capítulo 1";
         public const string Capitulo1Nome = "O relógio";

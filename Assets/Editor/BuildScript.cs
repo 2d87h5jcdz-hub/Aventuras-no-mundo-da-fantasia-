@@ -17,7 +17,7 @@ namespace Joaquim.EditorTools
     public static class BuildScript
     {
         public const string ScenePath = "Assets/Scenes/Main.unity";
-        const string ProductName = "Joaquim e o Relógio de Luz";
+        const string ProductName = "Joaquim No Reino da Fantasia";
         const string CompanyName = "Joaquim Games";
         const string AppId = "com.joaquimgames.relogiodeluz";
 

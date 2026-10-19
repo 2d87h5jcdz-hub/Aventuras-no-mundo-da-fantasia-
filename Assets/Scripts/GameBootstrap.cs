@@ -67,7 +67,8 @@ namespace Joaquim
             motes.Follow = player.transform;
 
             var story = root.AddComponent<StoryDirector>();
-            story.Init(world, player, rig, dialogue, fader, motes);
+            var intro = root.AddComponent<IntroVideo>();
+            story.Init(world, player, rig, dialogue, fader, motes, intro);
         }
     }
 }
