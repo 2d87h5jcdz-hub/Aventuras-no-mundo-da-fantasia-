@@ -85,7 +85,7 @@ jobs:
   ios-ipa:
     name: Xcode → IPA (sem assinatura)
     needs: unity
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - name: Baixar projeto Xcode
         uses: actions/download-artifact@v4
