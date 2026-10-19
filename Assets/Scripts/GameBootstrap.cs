@@ -51,6 +51,7 @@ namespace Joaquim
             var dialogue = root.AddComponent<DialogueBox>();
             var fader = root.AddComponent<ScreenFader>();
             root.AddComponent<Sfx>();
+            root.AddComponent<VirtualStick>();
 
             var player = new GameObject("Joaquim").AddComponent<Player>();
             player.World = world;

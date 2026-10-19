@@ -29,10 +29,15 @@ namespace Joaquim.Core
             if (Consumed) return false;
 #if ENABLE_INPUT_SYSTEM
             var touch = Touchscreen.current;
-            if (touch != null && touch.primaryTouch.press.wasPressedThisFrame)
+            if (touch != null)
             {
-                screenPosition = touch.primaryTouch.position.ReadValue();
-                return true;
+                // qualquer dedo (o outro pode estar segurando o joystick)
+                foreach (var t in touch.touches)
+                {
+                    if (!t.press.wasPressedThisFrame) continue;
+                    screenPosition = t.position.ReadValue();
+                    return true;
+                }
             }
             var mouse = Mouse.current;
             if (mouse != null && mouse.leftButton.wasPressedThisFrame)
@@ -41,7 +46,14 @@ namespace Joaquim.Core
                 return true;
             }
 #elif ENABLE_LEGACY_INPUT_MANAGER
-            if (Input.GetMouseButtonDown(0))
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                var t = Input.GetTouch(i);
+                if (t.phase != TouchPhase.Began) continue;
+                screenPosition = t.position;
+                return true;
+            }
+            if (Input.touchCount == 0 && Input.GetMouseButtonDown(0))
             {
                 screenPosition = Input.mousePosition;
                 return true;
@@ -50,9 +62,11 @@ namespace Joaquim.Core
             return false;
         }
 
-        /// <summary>Direção segurada no teclado (setas ou WASD). Zero se nada.</summary>
+        /// <summary>Direção segurada: joystick da tela ou teclado (setas/WASD). Zero se nada.</summary>
         public static Vector2Int HeldDirection()
         {
+            var stick = VirtualStick.Direction;
+            if (stick != Vector2Int.zero) return stick;
 #if ENABLE_INPUT_SYSTEM
             var kb = Keyboard.current;
             if (kb == null) return Vector2Int.zero;

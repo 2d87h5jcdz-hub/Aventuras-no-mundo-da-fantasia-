@@ -48,7 +48,8 @@ python tools/arte/gerar.py
 4. Aperte **Play**.
 
 Controles: **setas/WASD** para andar, **Espaço/Enter** para interagir/avançar.
-No celular: **toque** onde quer ir; toque em alguém ou na cama para interagir; toque para avançar o texto.
+No celular: encoste o dedo na **metade esquerda** da tela e arraste — um joystick aparece ali e some ao soltar.
+Toque na **metade direita** para interagir (em alguém/algo, ou com o que estiver na frente) e para avançar o texto.
 
 ## Build automático no GitHub Actions (APK + IPA)
 

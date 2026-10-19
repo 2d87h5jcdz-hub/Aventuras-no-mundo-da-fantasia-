@@ -11,7 +11,8 @@ namespace Joaquim.Actors
 {
     /// <summary>
     /// O Joaquim. Anda de tile em tile, como nos RPGs clássicos.
-    /// No celular: toque num lugar para ir até lá; toque em alguém/algo para interagir.
+    /// No celular: joystick que aparece ao encostar o dedo na metade esquerda da tela;
+    /// toque na metade direita para interagir.
     /// No computador: setas/WASD para andar, Espaço/Enter para interagir.
     /// </summary>
     public sealed class Player : MonoBehaviour
@@ -174,42 +175,34 @@ namespace Joaquim.Actors
             }
         }
 
+        /// <summary>
+        /// Toque na metade direita da tela (a esquerda é do joystick):
+        /// em alguém/algo → vai até lá e interage; em qualquer outro lugar → interage com o que está na frente.
+        /// </summary>
         void HandleTap(Vector2 screen)
         {
-            if (Cam == null) return;
+            if (Cam == null || VirtualStick.InZone(screen)) return;
             var ray = Cam.ScreenPointToRay(new Vector3(screen.x, screen.y, 0f));
 
             _path.Clear();
             _pendingInteract = null;
 
-            Vector2Int target;
-            if (!World.PickInteraction(ray, out target))
+            if (!World.PickInteraction(ray, out var target))
             {
-                if (!GameWorld.PickGround(ray, out target)) return;
-            }
-            if (target == Cell) return;
-
-            if (World.HasInteraction(target) && !World.IsWalkable(target))
-            {
-                if (GameWorld.AreNeighbors(Cell, target))
-                {
-                    FaceTo(FacingFrom(target - Cell));
-                    World.TryInteract(target);
-                    return;
-                }
-                var path = World.FindPath(Cell, c => GameWorld.AreNeighbors(c, target));
-                if (path == null) return;
-                foreach (var c in path) _path.Enqueue(c);
-                _pendingInteract = target;
+                World.TryInteract(Cell + DeltaOf(Face));
                 return;
             }
 
-            if (World.IsWalkable(target))
+            if (GameWorld.AreNeighbors(Cell, target))
             {
-                var path = World.FindPath(Cell, c => c == target);
-                if (path == null) return;
-                foreach (var c in path) _path.Enqueue(c);
+                FaceTo(FacingFrom(target - Cell));
+                World.TryInteract(target);
+                return;
             }
+            var path = World.FindPath(Cell, c => GameWorld.AreNeighbors(c, target));
+            if (path == null) return;
+            foreach (var c in path) _path.Enqueue(c);
+            _pendingInteract = target;
         }
 
         void BeginStep(Vector2Int target)
