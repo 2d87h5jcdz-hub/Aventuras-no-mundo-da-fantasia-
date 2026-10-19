@@ -149,9 +149,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls -la
-          gh release delete ultima-versao --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
-          gh release create ultima-versao Joaquim.ipa *.apk \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "Versão de teste #${{ github.run_number }}" \
-            --notes "Build automático. iPhone: baixe o Joaquim.ipa e abra no SideStore. Android: baixe o .apk."
+          # atualiza no lugar (sem apagar antes), para o link nunca ficar fora do ar
+          TITULO="Versão de teste #${{ github.run_number }}"
+          if gh release view ultima-versao --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload ultima-versao Joaquim.ipa *.apk --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit ultima-versao --title "$TITULO" --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create ultima-versao Joaquim.ipa *.apk \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "$TITULO" \
+              --notes "Build automático. iPhone: baixe o Joaquim.ipa e abra no SideStore. Android: baixe o .apk."
+          fi
