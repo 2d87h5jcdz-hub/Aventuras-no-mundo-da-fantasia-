@@ -153,6 +153,5 @@ jobs:
           gh release create ultima-versao Joaquim.ipa *.apk \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --prerelease \
             --title "Versão de teste #${{ github.run_number }}" \
             --notes "Build automático. iPhone: baixe o Joaquim.ipa e abra no SideStore. Android: baixe o .apk."
